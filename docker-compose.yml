@@ -1,0 +1,57 @@
+# The shared reverse proxy for this instance.
+#
+# One Traefik owns ports 80 and 443. Every application on the box — Sink Mailer
+# and whatever comes after it — joins the `traefik-public` network and describes
+# its own routing with labels on its own containers. Nothing in this directory
+# changes when an application is added, removed or redeployed.
+#
+# This stack is independent of any one application: bring it up once and leave
+# it running. See README.md.
+
+name: traefik
+
+services:
+  traefik:
+    image: traefik:v3.7
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+      # The dashboard, on loopback only. Reach it over an SSH tunnel:
+      #
+      #   ssh -L 8080:localhost:8080 ubuntu@<instance>
+      #
+      # then open http://localhost:8080/dashboard/ — the trailing slash matters.
+      # Bound this way it has no route from the internet, which is the only
+      # reason it is allowed to run without a password.
+      - '127.0.0.1:8080:8080'
+    volumes:
+      # How Traefik discovers applications, and why adding one needs no config
+      # here: it watches Docker for containers wearing routing labels.
+      #
+      # ⚠️  The Docker socket is root on the host. Read-only limits this to
+      #     watching rather than creating containers, but anything that can read
+      #     it can enumerate every container on the instance. Keep the `:ro`,
+      #     and weigh anything you add to this file against that.
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik.yml:/etc/traefik/traefik.yml:ro
+      # Issued certificates and the ACME account key. A named volume rather than
+      # a bind mount because Traefik requires this file to be 0600 and manages
+      # the permissions itself. Losing it means re-issuing every certificate,
+      # and Let's Encrypt rate-limits duplicates to 5 per week.
+      - letsencrypt:/letsencrypt
+    networks:
+      - traefik-public
+
+networks:
+  # Created once by hand, and shared by every application stack:
+  #
+  #   docker network create traefik-public
+  #
+  # External so that `docker compose down` — here or in any app — cannot delete
+  # the network and take every other app's routing with it.
+  traefik-public:
+    external: true
+
+volumes:
+  letsencrypt:

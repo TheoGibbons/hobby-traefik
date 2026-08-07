@@ -1,0 +1,79 @@
+# Traefik v3 static configuration.
+#
+# Static config is read once at startup — changes here need a container restart.
+# Per-application routing is *not* here: it lives in labels on each app's own
+# containers and is picked up live. Adding an app to this instance should never
+# mean editing this file.
+
+# ─────────────────────────────────────────────────────────────── entry points ──
+# The ports Traefik listens on. Everything from the internet arrives on one of
+# these two; the third is loopback-only and serves the dashboard.
+entryPoints:
+  web:
+    address: ':80'
+    http:
+      # Nothing is served over plaintext. The ACME challenge is the exception,
+      # and Traefik answers it ahead of this redirect internally — the two are
+      # designed to coexist, so certificate issuance still works on port 80.
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+          permanent: true
+
+  websecure:
+    address: ':443'
+
+  # Dashboard only. Published to 127.0.0.1 in docker-compose.yml, so it is
+  # reachable through an SSH tunnel and from nowhere else.
+  traefik:
+    address: ':8080'
+
+# ────────────────────────────────────────────────────────────────── providers ──
+providers:
+  docker:
+    endpoint: 'unix:///var/run/docker.sock'
+    # Opt-in routing. A container is invisible to Traefik unless it carries
+    # `traefik.enable=true`, which keeps databases, one-shot migration jobs and
+    # anything else you happen to run off the public internet by default.
+    exposedByDefault: false
+    # Which network to reach a container on when it sits on several. Apps should
+    # also set `traefik.docker.network` on themselves; this is the fallback.
+    network: traefik-public
+
+# ─────────────────────────────────────────────────────────────── certificates ──
+certificatesResolvers:
+  letsencrypt:
+    acme:
+      # ⚠️  CHANGE THIS before first start. Let's Encrypt sends expiry warnings
+      #     here. It is never published, but it must be a real address you read.
+      #
+      #     It lives in this file rather than in .env on purpose: Traefik reads
+      #     its static configuration from exactly one source, and setting any
+      #     TRAEFIK_* environment variable would make it ignore this file
+      #     entirely — a confusing failure to debug.
+      email: change-me@example.com
+      storage: /letsencrypt/acme.json
+      httpChallenge:
+        entryPoint: web
+
+      # Uncomment while you are getting DNS and firewall rules right. The
+      # staging CA issues untrusted certificates but has far looser rate limits
+      # than the 5-per-week cap on production duplicates. Delete the acme.json
+      # volume when you switch back, or the staging certs are kept and reused.
+      # caServer: https://acme-staging-v02.api.letsencrypt.org/directory
+
+# ───────────────────────────────────────────────────────────────── dashboard ──
+# `insecure` means "no authentication", which is safe here only because the
+# entry point above is published to loopback. Do not publish :8080 to 0.0.0.0.
+api:
+  dashboard: true
+  insecure: true
+
+# ─────────────────────────────────────────────────────────────────── logging ──
+log:
+  level: INFO
+
+# One line per request. Useful while setting a new app up; comment it out if the
+# volume gets tiresome.
+accessLog: {}
