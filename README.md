@@ -35,26 +35,31 @@ sudo usermod -aG docker $USER   # log out and back in for this to take effect
 Everything here builds from source or uses a multi-arch image, so arm64 needs no
 special handling.
 
-## Deploy the proxy
+**Git** — The repository is private, so the instance needs GitHub credentials that can read it
+The below commands give the server access to all the private repos in your GitHub account.
+```bash
+ssh-keygen -t ed25519 -C "EC2 GitHub" -f ~/.ssh/id_ed25519 -N ""
+cat ~/.ssh/id_ed25519.pub
+# Copy result to https://github.com/settings/keys
+```
+
+## Deploy
 
 ```bash
 # On the instance
-git clone https://github.com/TheoGibbons/hobby-traefik.git ~/traefik
-cd ~/traefik
-vi traefik.yml            # set certificatesResolvers.letsencrypt.acme.email
+git clone git@github.com:TheoGibbons/hobby-traefik.git ~/hobby-traefik
+cd ~/hobby-traefik
 
 docker network create traefik-public   # once, ever — shared by every app
 docker compose up -d
 docker compose logs -f
 ```
 
-The repository is private, so the instance needs GitHub credentials that can read it
-(for example, an SSH/deploy key or an authenticated HTTPS credential).
 
 To deploy later changes to the proxy:
 
 ```bash
-cd ~/traefik
+cd ~/hobby-traefik
 git pull --ff-only
 docker compose up -d
 ```
@@ -97,7 +102,7 @@ set them in `.env`.
 ```bash
 curl -I http://<domain>                  # 301 to https
 curl -s https://<domain>/api/health      # {"status":"ok",...}
-docker compose -f ~/traefik/docker-compose.yml logs | grep -i acme
+docker compose -f ~/hobby-traefik/docker-compose.yml logs | grep -i acme
 ```
 
 The dashboard shows whether a router was actually registered, which is the fastest

@@ -52,7 +52,7 @@ certificatesResolvers:
       #     its static configuration from exactly one source, and setting any
       #     TRAEFIK_* environment variable would make it ignore this file
       #     entirely — a confusing failure to debug.
-      email: change-me@example.com
+      email: theo_112@hotmail.com
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web
