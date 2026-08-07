@@ -4,8 +4,8 @@ One Traefik owns ports 80 and 443 and routes to every app on the box by hostname
 Apps don't get published web ports of their own — they join a shared Docker network
 and describe their routing in labels on their own containers.
 
-These two files are the whole proxy. They aren't specific to Sink Mailer: copy them
-to the instance, start them once, and leave them running.
+These two files are the whole proxy. They aren't specific to Sink Mailer: keep them
+in this repository, clone it onto the instance, start them once, and leave them running.
 
 ```
   docker-compose.yml   the proxy container
@@ -38,16 +38,25 @@ special handling.
 ## Deploy the proxy
 
 ```bash
-# On your machine
-scp -r deploy/traefik ubuntu@<instance>:~/traefik
-
 # On the instance
+git clone https://github.com/TheoGibbons/hobby-traefik.git ~/traefik
 cd ~/traefik
 vi traefik.yml            # set certificatesResolvers.letsencrypt.acme.email
 
 docker network create traefik-public   # once, ever — shared by every app
 docker compose up -d
 docker compose logs -f
+```
+
+The repository is private, so the instance needs GitHub credentials that can read it
+(for example, an SSH/deploy key or an authenticated HTTPS credential).
+
+To deploy later changes to the proxy:
+
+```bash
+cd ~/traefik
+git pull --ff-only
+docker compose up -d
 ```
 
 The network is created by hand rather than by a compose file so that
