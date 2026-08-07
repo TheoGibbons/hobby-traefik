@@ -55,7 +55,6 @@ docker compose up -d
 docker compose logs -f
 ```
 
-
 To deploy later changes to the proxy:
 
 ```bash
@@ -72,9 +71,10 @@ everything else on the instance.
 
 ```bash
 # On the instance
-git clone <repo> ~/sink-mailer && cd ~/sink-mailer
+git clone git@github.com:TheoGibbons/sink-mailer.git ~/sink-mailer
+cd ~/sink-mailer
 cp .env.example .env
-vi .env
+nano .env
 ```
 
 Set at least:
@@ -100,23 +100,10 @@ set them in `.env`.
 ## Check it worked
 
 ```bash
-curl -I http://<domain>                  # 301 to https
-curl -s https://<domain>/api/health      # {"status":"ok",...}
+curl -I http://www.sinkmailer.com                  # 301 to https
+curl -s https://www.sinkmailer.com/api/health      # {"status":"ok",...}
 docker compose -f ~/hobby-traefik/docker-compose.yml logs | grep -i acme
 ```
-
-The dashboard shows whether a router was actually registered, which is the fastest
-way to tell a label mistake from an app problem:
-
-```bash
-ssh -L 8080:localhost:8080 ubuntu@<instance>
-# then open http://localhost:8080/dashboard/  (trailing slash required)
-```
-
-If the certificate won't issue, uncomment `caServer` in `traefik.yml` to use the
-Let's Encrypt staging CA while you fix DNS or firewall rules — production limits
-duplicate certificates to 5 per week, and it is easy to burn through that. Delete
-the `letsencrypt` volume when switching back, or the staging certs get reused.
 
 ## Adding the next app
 
