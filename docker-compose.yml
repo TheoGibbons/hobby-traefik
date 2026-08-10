@@ -1,7 +1,7 @@
 # The shared reverse proxy for this instance.
 #
-# One Traefik owns ports 80 and 443. Every application on the box — Sink Mailer
-# and whatever comes after it — joins the `traefik-public` network and describes
+# In production, one Traefik owns ports 80 and 443. Every application joins the
+# `traefik-public` network and describes
 # its own routing with labels on its own containers. Nothing in this directory
 # changes when an application is added, removed or redeployed.
 #
@@ -14,9 +14,16 @@ services:
   traefik:
     image: traefik:v3.7
     restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'traefik', 'healthcheck', '--ping']
+      interval: 10s
+      timeout: 3s
+      retries: 5
     ports:
-      - '80:80'
-      - '443:443'
+      # Defaults are the public production bindings. Local .env overrides these
+      # with unprivileged loopback ports to avoid collisions with other projects.
+      - '${TRAEFIK_HTTP_BIND:-0.0.0.0}:${TRAEFIK_HTTP_PORT:-80}:80'
+      - '${TRAEFIK_HTTPS_BIND:-0.0.0.0}:${TRAEFIK_HTTPS_PORT:-443}:443'
       # The dashboard, on loopback only. Reach it over an SSH tunnel:
       #
       #   ssh -L 8080:localhost:8080 ubuntu@<instance>
@@ -24,15 +31,14 @@ services:
       # then open http://localhost:8080/dashboard/ — the trailing slash matters.
       # Bound this way it has no route from the internet, which is the only
       # reason it is allowed to run without a password.
-      - '127.0.0.1:8080:8080'
+      - '${TRAEFIK_DASHBOARD_BIND:-127.0.0.1}:${TRAEFIK_DASHBOARD_PORT:-8080}:8080'
     volumes:
       # How Traefik discovers applications, and why adding one needs no config
       # here: it watches Docker for containers wearing routing labels.
       #
-      # ⚠️  The Docker socket is root on the host. Read-only limits this to
-      #     watching rather than creating containers, but anything that can read
-      #     it can enumerate every container on the instance. Keep the `:ro`,
-      #     and weigh anything you add to this file against that.
+      # ⚠️  Access to the Docker socket is effectively root access to the host.
+      #     The :ro bind option does not restrict Docker API operations on a Unix
+      #     socket. Keep this container minimal and never add untrusted code.
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik.yml:/etc/traefik/traefik.yml:ro
       # Issued certificates and the ACME account key. A named volume rather than

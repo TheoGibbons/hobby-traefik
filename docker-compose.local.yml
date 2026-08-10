@@ -1,0 +1,7 @@
+# Local-only differences. The service, ports and shared Docker network still
+# come from docker-compose.yml; only the static Traefik configuration changes.
+
+services:
+  traefik:
+    volumes:
+      - ./traefik.local.yml:/etc/traefik/traefik.yml:ro

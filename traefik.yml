@@ -70,6 +70,11 @@ api:
   dashboard: true
   insecure: true
 
+# Used by the container health check. It is served on the loopback-only
+# dashboard entry point and is not exposed publicly.
+ping:
+  entryPoint: traefik
+
 # ─────────────────────────────────────────────────────────────────── logging ──
 log:
   level: INFO
