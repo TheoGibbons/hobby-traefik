@@ -34,4 +34,4 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
             "$EC2_USER@$EC2_HOST" \
-            'cd "$HOME/projects/hobby-traefik" && ./scripts/deploy.sh'
+            'cd "$HOME/hobby-traefik" && ./scripts/deploy.sh'

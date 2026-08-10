@@ -32,8 +32,8 @@ scripts/deploy.sh          pulls and safely updates the EC2 proxy
 Docker must be running and the current user must have access to it.
 
 ```bash
-git clone git@github.com:TheoGibbons/hobby-traefik.git ~/projects/hobby-traefik
-cd ~/projects/hobby-traefik
+git clone git@github.com:TheoGibbons/hobby-traefik.git ~/hobby-traefik
+cd ~//hobby-traefik
 cp .env.local.example .env
 ./scripts/up-local.sh
 ```
@@ -69,9 +69,8 @@ Log out and back in after changing group membership. Then clone and start the
 proxy without the local `.env` file:
 
 ```bash
-mkdir -p ~/projects
-git clone git@github.com:TheoGibbons/hobby-traefik.git ~/projects/hobby-traefik
-cd ~/projects/hobby-traefik
+git clone git@github.com:TheoGibbons/hobby-traefik.git ~//hobby-traefik
+cd ~//hobby-traefik
 ./scripts/deploy.sh
 ```
 
@@ -90,7 +89,7 @@ Then open <http://localhost:8080/dashboard/>.
 ## Push-to-deploy
 
 The workflow in `.github/workflows/deploy.yml` runs after a push to `main` and
-invokes `~/projects/hobby-traefik/scripts/deploy.sh` over SSH. Configure a GitHub
+invokes `~//hobby-traefik/scripts/deploy.sh` over SSH. Configure a GitHub
 environment named `production` with these secrets:
 
 | Secret | Value |

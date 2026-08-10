@@ -22,12 +22,15 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
 
 ## Host contract for our deployments
 
-- The proxy is managed by `~/projects/hobby-traefik`.
+- The proxy is managed by `~/hobby-traefik`.
 - The external Docker network is always named `traefik-public`.
 - Local HTTP uses the `web` entry point and a unique `*.localhost` hostname.
 - Production HTTPS uses the `websecure` entry point and the `letsencrypt`
   certificate resolver.
 - In production, only Traefik publishes host ports 80 and 443.
+- Documented non-HTTP services may still publish host ports. For example, SMTP
+  can be intentionally public while a remotely accessible database must be
+  protected by a source-restricted cloud firewall/security-group rule.
 - Router, service and middleware names must be globally unique. Prefix all of
   them with the repository name.
 - Databases and private workers do not join `traefik-public` and never receive
@@ -38,6 +41,8 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
 1. Keep the base Compose file free of Traefik labels, external networks, public
    hostnames and TLS assumptions.
 2. Put the standalone loopback port only in `docker-compose.override.yml`.
+   Required non-HTTP host ports belong in the base file when they must remain
+   available in standalone and Traefik modes.
 3. Put the shared network and common routing labels only in
    `docker-compose.traefik.yml`.
 4. Put TLS and secure-cookie overrides only in `docker-compose.prod.yml`.
