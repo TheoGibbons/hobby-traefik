@@ -32,8 +32,8 @@ scripts/deploy.sh          pulls and safely updates the EC2 proxy
 Docker must be running and the current user must have access to it.
 
 ```bash
-git clone git@github.com:TheoGibbons/hobby-traefik.git ~/hobby-traefik
-cd ~//hobby-traefik
+git clone git@github.com:TheoGibbons/hobby-traefik.git ~/projects/hobby-traefik
+cd ~/projects/hobby-traefik
 cp .env.local.example .env
 ./scripts/up-local.sh
 ```
@@ -69,10 +69,18 @@ Log out and back in after changing group membership. Then clone and start the
 proxy without the local `.env` file:
 
 ```bash
-git clone git@github.com:TheoGibbons/hobby-traefik.git ~//hobby-traefik
-cd ~//hobby-traefik
+git clone git@github.com:TheoGibbons/hobby-traefik.git ~/projects/hobby-traefik
+cd ~/projects/hobby-traefik
 ./scripts/deploy.sh
 ```
+
+Local and production repositories use the same `~/projects/<repository-name>`
+layout. Deployment workflows must use that production path.
+
+Baby Sign Language is a deliberate exception to the HTTP proxy pattern: its app
+runs on Vercel, while only PostgreSQL runs on EC2 from
+`~/projects/baby-sign-language`. That database publishes its dedicated TCP port
+directly and does not join the Traefik network.
 
 The deployment script creates `traefik-public` once, validates Compose, and
 waits for Traefik to become healthy. The external network survives
@@ -89,7 +97,7 @@ Then open <http://localhost:8080/dashboard/>.
 ## Push-to-deploy
 
 The workflow in `.github/workflows/deploy.yml` runs after a push to `main` and
-invokes `~//hobby-traefik/scripts/deploy.sh` over SSH. Configure a GitHub
+invokes `~/projects/hobby-traefik/scripts/deploy.sh` over SSH. Configure a GitHub
 environment named `production` with these secrets:
 
 | Secret | Value |

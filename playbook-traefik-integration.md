@@ -22,7 +22,9 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
 
 ## Host contract for our deployments
 
-- The proxy is managed by `~/hobby-traefik`.
+- The proxy is managed by `~/projects/hobby-traefik`.
+- Local and production application checkouts use `~/projects/<repository-name>`.
+  The deployment workflow must use that production path on EC2.
 - The external Docker network is always named `traefik-public`.
 - Local HTTP uses the `web` entry point and a unique `*.localhost` hostname.
 - Production HTTPS uses the `websecure` entry point and the `letsencrypt`
