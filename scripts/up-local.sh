@@ -5,7 +5,7 @@ repo_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_dir"
 
 if [[ ! -f .env ]]; then
-  cp .env.local.example .env
+  cp .env.example .env
 fi
 
 if ! docker network inspect traefik-public >/dev/null 2>&1; then
