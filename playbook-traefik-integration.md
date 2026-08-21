@@ -34,6 +34,19 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
 - Documented non-HTTP services may still publish host ports. For example, SMTP
   can be intentionally public while a remotely accessible database must be
   protected by a source-restricted cloud firewall/security-group rule.
+- Every published host port is unique across the instance, split into a
+  `${X_BIND:-127.0.0.1}:${X_PORT:-nnnn}:nnnn` pair so a local checkout exposes
+  nothing and only production widens the bind address. Record new allocations
+  here, because a collision surfaces as a container that will not start:
+
+  | Port | Owner | Notes |
+  |---|---|---|
+  | 80, 443 | hobby-traefik | The only public HTTP ports on the instance |
+  | 8080 | hobby-traefik | Dashboard, loopback only, reached over SSH |
+  | 2525 | sink-mailer | SMTP ingest, intentionally public |
+  | 5434 | sink-mailer | Postgres, source-restricted |
+  | 5436 | baby-sign-language | Postgres, source-restricted, TLS + pg_hba |
+  | 5437 | brains-v2-scraper | Postgres, source-restricted |
 - Router, service and middleware names must be globally unique. Prefix all of
   them with the repository name.
 - Databases and private workers do not join `traefik-public` and never receive
