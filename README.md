@@ -25,6 +25,7 @@ traefik.yml                production redirects and Let's Encrypt
 traefik.local.yml          local HTTP configuration
 scripts/up-local.sh        creates the network and starts local Traefik
 scripts/deploy.sh          pulls and safely updates the EC2 proxy
+.gitattributes             pins LF endings so Windows checkouts stay runnable
 ```
 
 ## Local setup
@@ -114,6 +115,15 @@ personal key with access to every repository.
 The deployment intentionally stops if tracked files were edited directly on
 the server. Commit changes through Git instead of letting live and local copies
 drift again.
+
+It also stops if the pulled checkout has CRLF line endings or a shell script
+that lost its executable bit — the two ways a Windows commit produces a
+repository that is correct in Git and broken on Ubuntu. `.gitattributes`
+prevents the first for every clone; the second has no repository-wide setting,
+so the check is what catches it — here, before anything is rebuilt, rather than
+as `bad interpreter: /usr/bin/env bash^M` at 3am. See
+[the playbook](playbook-traefik-integration.md#line-endings-and-the-executable-bit)
+for the full explanation and the repair steps.
 
 ## Production behavior
 
