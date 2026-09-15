@@ -220,27 +220,45 @@ Check these against the actual image:
 
 ### 2.4 Shuts down promptly on SIGTERM
 
-`docker stop` sends SIGTERM and kills after 10 seconds. An app that ignores it
-still works with draining, but every deploy waits the full 10 seconds, and the
-kill can interrupt writes.
+`docker stop` sends SIGTERM and kills after a timeout, 10 seconds by default. An
+app that ignores it still works with draining, but every deploy waits out the
+timeout, and the kill (exit code 137) can interrupt writes.
 
 - Use exec-form `CMD ["node", "server.js"]`, not `CMD npm start` or
   `CMD node server.js`. The shell form and `npm` do not forward signals.
-- Where the app cannot handle signals as PID 1, add `init: true` to the service.
+- **Exec form is not enough for Node.** As PID 1 the kernel ignores any signal
+  without a handler, and measure-the-baby, exec form and all, was killed with 137
+  rather than exiting. Handle it: stop accepting connections, finish in-flight
+  requests, close the database, exit 0. Confirm with
+  `docker stop <container>; docker inspect <container> --format '{{.State.ExitCode}}'`,
+  which must print 0.
+- Where the app cannot handle signals itself, add `init: true` to the service.
+- **Long requests need a longer grace period.** A long-poll, a large download or a
+  streaming response still running on the drained container is cut off when the
+  timeout expires. Set `stop_grace_period` on the service to the longest such
+  request plus 15 seconds, and make sure shutdown waits for in-flight requests
+  rather than exiting straight away.
 
-### 2.5 Keep a browser on one container if state lives in memory
+### 2.5 Keep a browser on one container
 
 For about 30 seconds both releases serve, and Traefik alternates between them
-request by request. Anything a user creates in one request and needs in the next
-breaks if it lives in one container's memory or filesystem:
+request by request — verified in its access log. Anything that must come from the
+same release as the request before it breaks:
 
 - in-memory sessions (express-session's default `MemoryStore`, PHP file sessions
   in the container, Flask server-side sessions on local disk)
 - CSRF tokens, upload progress, multi-step forms, one-time tickets held in memory
 - WebSocket or SSE setups that rely on an earlier HTTP request
+- **static assets**: the old release's HTML followed by the new release's
+  JavaScript. With hashed bundle names (Vite, webpack, Next.js) the new container
+  has no file by the old name and answers 404, so the page fails to load
+- a service worker installing its cache from both releases, which then persists
+  the mix
 
-Sessions in a signed cookie, a database or Redis do not need this. When in doubt,
-add it; it is harmless. Use the service name from the existing labels:
+Nearly every app serving a browser hits the static-asset case, so add the cookie
+to every rolled service that serves HTML. Only a pure API, whose clients never
+chain requests to per-container state, can go without. Use the service name from
+the existing labels:
 
 ```yaml
 # docker-compose.traefik.yml
@@ -477,6 +495,8 @@ On the server, after the second deploy:
 | 404 for 10+ seconds; Traefik logs `defined multiple times with different configurations` | Old and new containers have different routing labels, and the old one was drained. Check the label comparison in the script matches the service |
 | 502s or hung requests on every deploy | The running image lacks the drain check, or `interval × retries` exceeds the hook's sleep |
 | Users lose a session or a multi-step action fails during deploys | In-memory state without sticky cookies; see Step 2.5 |
+| A page loads blank or its JavaScript 404s during deploys | HTML and assets came from different releases; see Step 2.5 |
+| API clients see 502 on long-polls or downloads during deploys | `stop_grace_period` shorter than the request; see Step 2.4 |
 | Every deploy pauses 10 s at "Stopping and removing old containers" | The app ignores SIGTERM; see Step 2.4 |
 | A worker never picks up new code | It is not in `after_rollout`, or it was put in `rolled` |
 
