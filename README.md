@@ -10,6 +10,7 @@ This repository is also the store of runbooks the other projects follow:
 | Document | Purpose |
 |---|---|
 | [playbook-traefik-integration.md](playbook-traefik-integration.md) | Adding a project to the shared proxy: overlays, ports, required variables, line endings |
+| [playbook-zero-downtime-deploys.md](playbook-zero-downtime-deploys.md) | Making a project's LIVE deploy swap releases without taking the site down |
 | [playbook-readme-standard.md](playbook-readme-standard.md) | The five deployment sections every project README carries |
 | [templates/README.skeleton.md](templates/README.skeleton.md) | Fill-in-the-blanks README for a new project |
 
@@ -51,9 +52,15 @@ bash scripts/deploy.sh
 loopback ports for local development; on the server the defaults are the public 80 and
 443. The deploy script ignores any `.env` that gets copied over by accident.
 
-The script creates `traefik-public` once, validates Compose, and waits for Traefik to
+The script creates `traefik-public` once, installs the pinned
+[docker-rollout](https://github.com/wowu/docker-rollout) plugin that application deploys
+use to swap releases without downtime, validates Compose, and waits for Traefik to
 become healthy. The external network survives `docker compose down` in this or any
 application repository.
+
+Deploy this before any application on a new server. Application deploy scripts stop
+with an explanation when either the network or the plugin is missing, and rerunning this
+script supplies both.
 
 ## Deploying to LIVE with hobby-traefik
 
@@ -139,6 +146,8 @@ traefik.yml                production redirects and Let's Encrypt
 traefik.local.yml          local HTTP configuration
 scripts/up-local.sh        creates the network and starts local Traefik
 scripts/deploy.sh          pulls and safely updates the proxy on the server
+scripts/install-docker-rollout.sh
+                           pinned, checksummed zero-downtime deploy plugin
 .gitattributes             pins LF endings so Windows checkouts stay runnable
 ```
 

@@ -37,6 +37,11 @@ if ! docker network inspect traefik-public >/dev/null 2>&1; then
   docker network create traefik-public
 fi
 
+# Application deploy scripts swap releases with the docker-rollout plugin. Like
+# the network above it belongs to the host rather than to any one app, and this
+# proxy is deployed first on every server. A no-op once the pinned version is in.
+bash scripts/install-docker-rollout.sh
+
 # Ignore any accidentally copied local .env file: production always uses the
 # base Compose file and its public 80/443 defaults.
 compose=(docker compose --env-file /dev/null -f docker-compose.yml)

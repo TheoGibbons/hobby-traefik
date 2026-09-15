@@ -71,7 +71,9 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
    Explicit file selection intentionally prevents Compose from automatically
    loading the standalone override.
 7. Add a deployment script that pulls with `--ff-only`, validates Compose,
-   rebuilds, and waits for healthy containers.
+   rebuilds, and waits for healthy containers. Public web services swap
+   releases with `docker rollout` rather than `up`, so a deploy does not take the
+   site down; follow [playbook-zero-downtime-deploys.md](playbook-zero-downtime-deploys.md).
 8. Add a GitHub Actions workflow that SSHes to the EC2 checkout and invokes the
    deployment script. The server checkout remains the deployment source.
 9. Commit a `.gitattributes` that pins LF, record the executable bit through
@@ -95,6 +97,9 @@ services:
     expose:
       - '3000'
 ```
+
+Never give a Traefik-routed service a `container_name`. A zero-downtime deploy
+runs two copies of it for a few seconds, and they cannot share a fixed name.
 
 ## Standalone override pattern
 
@@ -366,3 +371,6 @@ git commit -m "Normalize line endings to LF"
 - `git ls-files -s -- '*.sh'` reports mode `100755` for every script.
 - `docker compose config` fails with a message naming the variable when a
   required secret in `.env` is blank.
+- The verification checklist in
+  [playbook-zero-downtime-deploys.md](playbook-zero-downtime-deploys.md) passes
+  for every Traefik-routed service.
