@@ -357,6 +357,11 @@ for service in $("${compose[@]}" config --services); do
   fi
 done
 
+# Without this every build attaches a fresh provenance attestation, which gives
+# an unchanged image a new ID, and the server's Compose (2.40) recreates any
+# container whose image ID changed: services that are not rolled restarted on
+# every deploy. These images never leave the host, so nothing reads it.
+export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 "${compose[@]}" build
 
 if (( ${#before_rollout[@]} )); then
@@ -528,6 +533,7 @@ On the server, after the second deploy:
 | API clients see 502 on long-polls or downloads during deploys | `stop_grace_period` shorter than the request; see Step 2.4 |
 | Every deploy pauses 10 s at "Stopping and removing old containers" | The app ignores SIGTERM; see Step 2.4 |
 | A worker never picks up new code | It is not in `after_rollout`, or it was put in `rolled` |
+| A database, SMTP or worker container is recreated by a deploy that changed nothing | The build attached a provenance attestation, giving the unchanged image a new ID, and Compose 2.40 recreates on that. Export `BUILDX_NO_DEFAULT_ATTESTATIONS=1` before building, as the template does |
 
 ## What to report back
 
