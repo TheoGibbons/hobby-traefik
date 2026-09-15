@@ -5,9 +5,16 @@ to `main` no longer takes the site offline. It assumes the project already follo
 [playbook-traefik-integration.md](playbook-traefik-integration.md), and it is
 specific enough to hand to an LLM together with the target repository.
 
-shred-link is the reference implementation: its `Dockerfile`,
-`docker-compose.traefik.yml`, `docker-compose.prod.yml` and `scripts/deploy.sh`
-carry every piece described here.
+Four projects implement it, each verified by deploying under continuous load
+through Traefik with no failed requests. Their `scripts/deploy.sh` differ only in
+their service lists and project-specific checks; read the one closest in shape:
+
+| Project | Shape |
+|---|---|
+| shred-link | One web service; secrets held in memory, so sticky cookies are essential |
+| measure-the-baby | One web service on SQLite; needed a SIGTERM handler |
+| mysql-browser | One nginx static site with a Compose-defined health check |
+| sink-mailer | Postgres, one-shot migrations, a rolled web service with 60 s long-polls, and SMTP on a host port that cannot roll |
 
 ## Goals
 
@@ -102,7 +109,11 @@ script enforces that.
 |---|---|---|
 | Receives HTTP through Traefik (`traefik.enable: 'true'`) | `rolled` | This is what users see go down |
 | Something a rolled service needs to start: database, cache, queue broker | `before_rollout` | Must be up and current before the new release boots |
+| A job that runs to completion and exits, such as migrations, when it is not behind a Compose profile | `one_shot` | Must finish before the new release boots; see the note under the template |
 | Everything else: workers, schedulers, SMTP, anything without inbound HTTP | `after_rollout` | No traffic to protect, and two copies of a worker run jobs twice |
+
+Services behind an inactive Compose `profiles:` entry are not listed by
+`config --services` and need no list; keep however the script already runs them.
 
 A service that would otherwise be `rolled` **cannot** be rolled, and belongs in
 `after_rollout`, if any of these is true. Say so in the report rather than working
@@ -315,7 +326,7 @@ fi
 ```
 
 **Second**, replace the `compose=(…)`, `config`, `up` and `ps` lines at the end
-with this, filling in the three lists from Step 1 and keeping the project's own
+with this, filling in the four lists from Step 1 and keeping the project's own
 Compose files:
 
 ```bash
@@ -325,20 +336,23 @@ compose=(docker compose "${compose_args[@]}")
 # Every service must be in exactly one list; see "Decide which services to roll"
 # in hobby-traefik's playbook-zero-downtime-deploys.md.
 #   before_rollout  what the rolled services need running first (databases)
+#   one_shot        jobs that run to completion before the rollout (migrations)
 #   rolled          Traefik-routed services, swapped without downtime
 #   after_rollout   everything else, updated with a plain `up`
 before_rollout=()
+one_shot=()
 rolled=(app)
 after_rollout=()
+long_running=("${before_rollout[@]}" "${rolled[@]}" "${after_rollout[@]}")
 
 "${compose[@]}" config --quiet
 
 # A service missing from the lists would be started once and never updated, so a
 # service added to Compose later has to be classified before the next deploy.
-listed=" ${before_rollout[*]} ${rolled[*]} ${after_rollout[*]} "
+listed=" ${long_running[*]} ${one_shot[*]} "
 for service in $("${compose[@]}" config --services); do
   if [[ "$listed" != *" $service "* ]]; then
-    echo "Service '$service' is not in before_rollout, rolled or after_rollout in scripts/deploy.sh." >&2
+    echo "Service '$service' is not in a service list in scripts/deploy.sh." >&2
     exit 1
   fi
 done
@@ -348,6 +362,15 @@ done
 if (( ${#before_rollout[@]} )); then
   "${compose[@]}" up -d --wait --wait-timeout 90 "${before_rollout[@]}"
 fi
+
+# One-shot jobs finish while the previous release is still serving, so
+# migrations must stay backward compatible with it. They run through `up` rather
+# than `run` so their service container is replaced too: the rollout starts the
+# rolled services' dependencies again, and would otherwise re-run the previous
+# release's job.
+for service in "${one_shot[@]}"; do
+  "${compose[@]}" up --no-deps --exit-code-from "$service" "$service"
+done
 
 # `up` would stop the running release before starting the new one, and the site
 # would be down until the new one passed its health check. docker rollout starts
@@ -385,8 +408,10 @@ if (( ${#after_rollout[@]} )); then
 fi
 
 # Removes containers of services no longer in the Compose files and confirms
-# everything is healthy. --no-recreate stops it replacing what was just rolled.
-"${compose[@]}" up -d --no-recreate --remove-orphans --wait --wait-timeout 90
+# every long-running service is healthy. Naming them with --no-deps keeps it from
+# re-running one-shot jobs or waiting on their exited containers, and
+# --no-recreate stops it replacing what was just rolled.
+"${compose[@]}" up -d --no-deps --no-recreate --remove-orphans --wait --wait-timeout 90 "${long_running[@]}"
 "${compose[@]}" ps
 ```
 
@@ -395,10 +420,14 @@ Adjust only these, and say so in the report:
 - `--timeout 90` must exceed the slowest realistic boot, including migrations run
   at startup.
 - `sleep 20` must exceed `interval × retries` + 5 seconds + the longest normal
-  request. Long uploads or downloads need more.
-- The template was verified with long-running services only. If the project has
-  a one-shot service that exits (a migration container), keep however the existing
-  script runs it, before the rollout, and test the deploy locally.
+  request. Long-polls, uploads and downloads are covered by `stop_grace_period`
+  instead; see Step 2.4.
+
+Verified behaviour of the `one_shot` step, so it is not "fixed" later: a failing
+job fails the deploy with its own exit code before anything is rolled; the rolled
+service's `depends_on: condition: service_completed_successfully` then re-runs the
+job once more during the rollout, from the new image, which is harmless for
+idempotent migrations; and the final `up` neither runs it again nor waits on it.
 
 The CI workflow does not change.
 
@@ -446,7 +475,7 @@ Statically, in the repository:
   `healthcheck` with `start_interval`. (Set `APP_HOST` and required variables in
   the shell for this, or use the example env file.)
 - `grep -rn "<old container_name>"` finds nothing outside Git history.
-- `bash -n scripts/deploy.sh` passes, the three lists cover every service from
+- `bash -n scripts/deploy.sh` passes, the service lists cover every service from
   `config --services`, and the script still ends with `up … --wait` and `ps`.
 - The health check passes inside a running container, and fails within
   `interval × retries` of `touch /tmp/drain`:
