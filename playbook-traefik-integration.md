@@ -44,6 +44,8 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
   | 80, 443 | hobby-traefik | The only public HTTP ports on the instance |
   | 8080 | hobby-traefik | Dashboard, loopback only, reached over SSH |
   | 2525 | sink-mailer | SMTP ingest, intentionally public |
+  | 3083 | shred-link | HTTP, loopback only unless a standalone LIVE run widens it |
+  | 3084 | mysql-browser | Marketing site, loopback only unless a standalone LIVE run widens it |
   | 5434 | sink-mailer | Postgres, source-restricted |
   | 5436 | baby-sign-language | Postgres, source-restricted, TLS + pg_hba |
   | 5437 | brains-v2-scraper | Postgres, source-restricted |
