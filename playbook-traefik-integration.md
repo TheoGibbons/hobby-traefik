@@ -47,9 +47,11 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
   | 3083 | shred-link | HTTP, loopback only unless a standalone LIVE run widens it |
   | 3084 | mysql-browser | Marketing site, loopback only unless a standalone LIVE run widens it |
   | 3085 | reelmarks | HTTP, loopback only unless a standalone LIVE run widens it |
+  | 3087 | dishly | HTTP, loopback only unless a standalone LIVE run widens it |
   | 5434 | sink-mailer | Postgres, source-restricted |
   | 5436 | baby-sign-language | Postgres, source-restricted, TLS + pg_hba |
   | 5437 | brains-v2-scraper | Postgres, source-restricted |
+  | 5441 | dishly | Postgres, source-restricted |
 - Router, service and middleware names must be globally unique. Prefix all of
   them with the repository name.
 - Databases and private workers do not join `traefik-public` and never receive
