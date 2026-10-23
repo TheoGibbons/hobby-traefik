@@ -9,7 +9,7 @@ This repository is also the store of runbooks the other projects follow:
 
 | Document | Purpose |
 |---|---|
-| [playbook-traefik-integration.md](playbook-traefik-integration.md) | Adding a project to the shared proxy: overlays, ports, required variables, line endings |
+| [playbook-traefik-integration.md](playbook-traefik-integration.md) | Adding a project to the shared proxy: overlays, ports, required variables, line endings; and removing one |
 | [playbook-zero-downtime-deploys.md](playbook-zero-downtime-deploys.md) | Making a project's LIVE deploy swap releases without taking the site down |
 | [playbook-readme-standard.md](playbook-readme-standard.md) | The five deployment sections every project README carries |
 | [templates/README.skeleton.md](templates/README.skeleton.md) | Fill-in-the-blanks README for a new project |
@@ -148,6 +148,10 @@ scripts/up-local.sh        creates the network and starts local Traefik
 scripts/deploy.sh          pulls and safely updates the proxy on the server
 scripts/install-docker-rollout.sh
                            pinned, checksummed zero-downtime deploy plugin
+scripts/install-cron.sh    installs the weekly jobs below; run by deploy.sh
+scripts/docker-cleanup.sh  weekly: old build cache and untagged images
+scripts/prune-stale-certs.sh
+                           weekly: certificates for hostnames no longer served
 .gitattributes             pins LF endings so Windows checkouts stay runnable
 ```
 
@@ -175,6 +179,21 @@ ssh -L 8080:localhost:8080 ubuntu@your-server
 ```
 
 Then open <http://localhost:8080/dashboard/>.
+
+`scripts/deploy.sh` installs two weekly jobs into the deploying user's crontab,
+both on Sunday mornings with output in `journalctl -t hobby-traefik`:
+
+- **04:00 `scripts/docker-cleanup.sh`** removes build cache older than a week and
+  untagged images. It never touches volumes or stopped containers.
+- **04:15 `scripts/prune-stale-certs.sh`** removes certificates for hostnames no
+  application serves any more, from removed applications or changed URLs.
+  Traefik otherwise keeps renewing them, and every renewal fails once the DNS
+  record is gone. A certificate goes only when no router uses its hostname
+  *and* its DNS no longer points at this server, so an application that is
+  mid-deploy or down keeps its certificate. When something is removed, Traefik
+  restarts for a few seconds, and the previous `acme.json` is kept in
+  `~/.local/state/hobby-traefik/acme-backups` (the last five). Run it with
+  `--dry-run` to see what it would remove.
 
 Back up the `letsencrypt` volume. If it is lost, certificates must be reissued and
 Let's Encrypt's duplicate-certificate rate limits — five per week — can apply.

@@ -42,6 +42,10 @@ fi
 # proxy is deployed first on every server. A no-op once the pinned version is in.
 bash scripts/install-docker-rollout.sh
 
+# Weekly Docker cleanup and stale-certificate pruning. Also host-wide, and
+# rewritten in place on every deploy.
+bash scripts/install-cron.sh
+
 # Ignore any accidentally copied local .env file: production always uses the
 # base Compose file and its public 80/443 defaults.
 compose=(docker compose --env-file /dev/null -f docker-compose.yml)

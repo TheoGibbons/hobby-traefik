@@ -359,6 +359,38 @@ git add --renormalize .
 git commit -m "Normalize line endings to LF"
 ```
 
+## Removing an application
+
+Taking an application off the instance is more than deleting its checkout.
+
+1. Stop it from its checkout, with the same files its deploy uses:
+
+   ```bash
+   cd ~/projects/<repository-name>
+   docker compose --env-file .env -f docker-compose.yml \
+     -f docker-compose.traefik.yml -f docker-compose.prod.yml down
+   ```
+
+   Add `-v` only once its data is backed up or no longer wanted: it deletes the
+   named volumes, databases included. Deleting the directory first leaves the
+   containers running with nothing to stop them from.
+2. Delete its DNS records, and remove its rows from the port table under
+   [Host contract for our deployments](#host-contract-for-our-deployments).
+3. Delete the checkout, `~/projects/<repository-name>`.
+
+Its certificates need no step. Traefik keeps renewing every certificate in
+`acme.json`, used or not, and once the DNS record is gone each attempt fails with
+`NXDOMAIN` and counts against Let's Encrypt's rate limits.
+`scripts/prune-stale-certs.sh` in this repository removes them every Sunday;
+see [Operating it](README.md#operating-it). The same covers an application that
+moves to a new hostname. To clear them straight away, which restarts Traefik for
+a few seconds:
+
+```bash
+bash ~/projects/hobby-traefik/scripts/prune-stale-certs.sh --dry-run   # list them
+bash ~/projects/hobby-traefik/scripts/prune-stale-certs.sh
+```
+
 ## Verification checklist
 
 - Plain `docker compose config` succeeds without `traefik-public` and contains
