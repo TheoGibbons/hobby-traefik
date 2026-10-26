@@ -156,6 +156,70 @@ services:
       traefik.http.routers.my-app.tls.certresolver: letsencrypt
 ```
 
+## Optional password gate
+
+A project that should not be public, such as a staging copy or a private tool,
+can sit behind the browser's username and password prompt: the equivalent of
+nginx's `auth_basic` with an `htpasswd` file. Traefik's `basicAuth` middleware
+does it with labels on the application's own container, so this repository
+still needs no change.
+
+Put it in `docker-compose.prod.yml` only, beside the TLS labels. Basic auth
+resends the password with every request, merely base64-encoded, and production
+is the one mode where every request is HTTPS. The local `*.localhost` route and
+the standalone loopback port stay open.
+
+```yaml
+# docker-compose.prod.yml
+services:
+  app:
+    labels:
+      traefik.http.routers.my-app.middlewares: my-app-auth
+      traefik.http.middlewares.my-app-auth.basicauth.users: '${APP_BASIC_AUTH_USERS:?set APP_BASIC_AUTH_USERS in .env}'
+      # The application never sees the password.
+      traefik.http.middlewares.my-app-auth.basicauth.removeheader: 'true'
+```
+
+Generate an entry on any machine with Docker. It prompts for the password, which
+keeps it out of shell history, and prints a bcrypt `admin:$2y$05$…` line:
+
+```bash
+docker run --rm -it httpd:2.4-alpine htpasswd -nB admin
+```
+
+Put it in the server's `.env` **in single quotes**, comma-separating users:
+
+```bash
+APP_BASIC_AUTH_USERS='admin:$2y$05$…,alice:$2y$05$…'
+```
+
+Leave it blank in `.env.production.example`, so a missing value fails
+`docker compose config` like any other required secret.
+
+Things to watch:
+
+- **Single quotes, or every login fails.** Compose interpolates unquoted and
+  double-quoted `.env` values, so each `$…` in the hash is read as a variable
+  and replaced with nothing. Validation still passes, Traefik loads the mangled
+  hash, and every login, the correct one included, is `401`. The only sign is a
+  run of warnings from `docker compose config` such as
+  `The "apr1" variable is not set. Defaulting to a blank string.` Never write
+  the hash into a Compose file instead: every `$` would need doubling, and it is
+  a secret.
+- **`middlewares` is one list.** The production overlay replaces the router's
+  whole `middlewares` label, so repeat any that the Traefik overlay already
+  sets: `my-app-retry,my-app-auth`.
+- **Health checks are unaffected; probes from outside are not.** Docker health
+  checks run inside the container and never pass through Traefik, so
+  zero-downtime deploys work unchanged. Anything that requests the public URL,
+  such as the checklist below, the curl loop in the zero-downtime playbook or an
+  uptime monitor, gets `401` unless it sends `-u <user>:<password>`.
+- **It is a gate, not an account system.** There is no logout, because the
+  browser keeps the credentials until it closes, and no lockout or rate limit,
+  so use a long random password. An application whose clients send their own
+  `Authorization` header, such as bearer tokens for an API, cannot sit behind
+  it: the header holds one credential, and the gate consumes it.
+
 ## Commands
 
 Standalone users need only:
@@ -400,6 +464,9 @@ bash ~/projects/hobby-traefik/scripts/prune-stale-certs.sh
 - The standalone localhost URL works without Traefik running.
 - The local `*.localhost` URL works through Traefik.
 - HTTP redirects to HTTPS and the health endpoint succeeds in production.
+- With a password gate, the production URL returns `401` without credentials
+  and `200` with `curl -u <user>:<password>`, and the local `*.localhost` URL
+  asks for none.
 - Taking down an application cannot remove the external `traefik-public` network.
 - `git ls-files --eol -- '*.sh'` reports `w/lf` for every script, and a fresh
   clone on the Windows machine produces scripts that still start with `#!`.

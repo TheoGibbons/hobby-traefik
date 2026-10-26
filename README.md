@@ -9,7 +9,7 @@ This repository is also the store of runbooks the other projects follow:
 
 | Document | Purpose |
 |---|---|
-| [playbook-traefik-integration.md](playbook-traefik-integration.md) | Adding a project to the shared proxy: overlays, ports, required variables, line endings; and removing one |
+| [playbook-traefik-integration.md](playbook-traefik-integration.md) | Adding a project to the shared proxy: overlays, ports, an optional password gate, required variables, line endings; and removing one |
 | [playbook-zero-downtime-deploys.md](playbook-zero-downtime-deploys.md) | Making a project's LIVE deploy swap releases without taking the site down |
 | [playbook-readme-standard.md](playbook-readme-standard.md) | The five deployment sections every project README carries |
 | [templates/README.skeleton.md](templates/README.skeleton.md) | Fill-in-the-blanks README for a new project |
