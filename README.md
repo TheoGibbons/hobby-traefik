@@ -116,16 +116,31 @@ repository and rejects the same key on a second with "Key is already in use". On
 covers every repository on the box, which is the whole reason to prefer it.
 
 **Part 2 — once per repository.** The same EC2 keypair is reused for every project,
-so only these four secrets are new. Create a GitHub environment named `production`,
-then:
+so only these four secrets are new. The block creates the `production` environment
+they live in, and stops before setting anything if the instance's host key is not
+the one you expect:
 
 ```bash
-# Locally, with the gh CLI authenticated:
-gh secret set EC2_HOST            --env production --body '<ec2-public-dns>'
-gh secret set EC2_USER            --env production --body 'ubuntu'
-gh secret set EC2_SSH_PRIVATE_KEY --env production < ~/.ssh/<ec2-deploy-key>
-gh secret set EC2_KNOWN_HOSTS     --env production \
-  --body "$(ssh-keyscan -H <ec2-public-dns> 2>/dev/null)"
+# Locally, from inside this repository's checkout, with the gh CLI authenticated.
+# <ed25519-fingerprint> is the SHA256:... this prints on the instance:
+#   ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+(
+  set -euo pipefail
+  host='<ec2-public-dns>'
+  known_hosts="$(ssh-keyscan -H "$host" 2>/dev/null)"
+  # GitHub Actions trusts whatever goes into EC2_KNOWN_HOSTS, so check it
+  # against the instance's own fingerprint rather than the network's word.
+  if ! ssh-keygen -lf - <<<"$known_hosts" | grep -qF '<ed25519-fingerprint>'; then
+    echo "The host key for $host does not match; nothing was set." >&2
+    exit 1
+  fi
+  # The workflow deploys from this environment; creating it again is a no-op.
+  gh api -X PUT 'repos/{owner}/{repo}/environments/production' --silent
+  gh secret set EC2_HOST            --env production --body "$host"
+  gh secret set EC2_USER            --env production --body 'ubuntu'
+  gh secret set EC2_SSH_PRIVATE_KEY --env production < ~/.ssh/<ec2-deploy-key>
+  gh secret set EC2_KNOWN_HOSTS     --env production --body "$known_hosts"
+)
 ```
 
 The deploy stops if tracked files were edited directly on the server, and if the pulled

@@ -155,6 +155,22 @@ makes that one paste rather than sixteen form fields.
 | `EC2_SSH_PRIVATE_KEY` | Private key whose public half is in the instance's `authorized_keys` |
 | `EC2_KNOWN_HOSTS` | Verified `known_hosts` line for `EC2_HOST` |
 
+The block in [templates/README.skeleton.md](templates/README.skeleton.md) does two
+things a bare list of `gh secret set` lines does not, and both are part of the
+standard:
+
+- **It creates the `production` environment.** The workflow's `environment:
+  production` reads its secrets from there, and creating it is idempotent, so the
+  block works on a new repository and an old one alike.
+- **It verifies the host key.** Whatever lands in `EC2_KNOWN_HOSTS` is what every
+  future deploy trusts, so `ssh-keyscan`'s answer is checked against the ED25519
+  fingerprint read on the instance itself, `ssh-keygen -lf
+  /etc/ssh/ssh_host_ed25519_key.pub`, and nothing is set if it differs.
+
+The secrets are identical for every repository on an instance, so setting them on
+several at once is a loop over the same commands with `--repo <owner>/<name>`, and
+the environment URL spelled out instead of `{owner}/{repo}`.
+
 ## Databases
 
 Every project with a database publishes it on a host port so a client can reach it,

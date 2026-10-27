@@ -57,6 +57,13 @@ shared proxy. It is specific enough to hand to an LLM with the target repository
   them with the repository name.
 - Databases and private workers do not join `traefik-public` and never receive
   `traefik.enable=true`.
+- Every project on our instance is registered with server-health
+  (`~/projects/server-health`, a private repository), which reports the whole
+  instance's health on one endpoint for an uptime monitor. Add the project's
+  Compose project name, with each long-running service, under `projects:` in its
+  `config.yml`, and push. Its Git state, and whether its checkout is deployed,
+  are checked without registering; its containers are only judged once listed.
+  A project's own repository does not mention server-health.
 
 ## Changes to make
 
@@ -440,6 +447,8 @@ Taking an application off the instance is more than deleting its checkout.
    containers running with nothing to stop them from.
 2. Delete its DNS records, and remove its rows from the port table under
    [Host contract for our deployments](#host-contract-for-our-deployments).
+   Remove it from server-health's `config.yml` too, or that check fails as soon
+   as its containers are gone.
 3. Delete the checkout, `~/projects/<repository-name>`.
 
 Its certificates need no step. Traefik keeps renewing every certificate in
