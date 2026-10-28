@@ -73,7 +73,10 @@ times with different configurations` and serves **neither**: 404 for as long as
 both exist. Draining makes that window longer. The deploy script therefore
 compares the running container's `traefik.*` labels with the new configuration's,
 and skips draining when they differ, trading a 20-second outage for a sub-second
-blip on the rare deploy that changes routing.
+blip on the rare deploy that changes routing. The comparison must unescape `$$`:
+`compose config` prints a literal `$` (such as a `redirectregex` `$${1}`) escaped,
+while the container holds it unescaped, so without that every deploy looks like a
+routing change and none of them drain.
 
 ## Host prerequisite
 
@@ -391,13 +394,17 @@ done
 # containers describe differently and serves 404 while both exist, so draining
 # would stretch that into a 20-second outage. Stop the old one immediately
 # instead and accept a sub-second blip.
+#
+# `compose config` prints a literal $ escaped as $$, while the container holds
+# the label Traefik reads. Unescape it before comparing, or a label with a
+# literal $, such as a redirectregex ${1}, would always look changed.
 routing_labels() { { grep -o '"traefik\.[^"]*": *"[^"]*"' || true; } | sed 's/": *"/":"/' | sort; }
 for service in "${rolled[@]}"; do
   rollout=(docker rollout "${compose_args[@]}" --timeout 90)
   running_ids="$("${compose[@]}" ps --quiet "$service")"
   if [[ -n "$running_ids" ]]; then
     live_labels="$(docker inspect --format '{{json .Config.Labels}}' "${running_ids%%$'\n'*}" | routing_labels)"
-    new_labels="$("${compose[@]}" config --format json "$service" | routing_labels)"
+    new_labels="$("${compose[@]}" config --format json "$service" | sed 's/\$\$/$/g' | routing_labels)"
     if [[ "$live_labels" == "$new_labels" ]]; then
       rollout+=(--pre-stop-hook 'touch /tmp/drain && sleep 20')
     else
@@ -527,6 +534,7 @@ On the server, after the second deploy:
 | `New containers are not healthy. Rolling back.` | The release is broken, or boots slower than `--timeout`. The output above it has the health log and container logs. The old release is still serving |
 | Health check always unhealthy on a fresh image | The probe tool is not in the image, or the probe uses the host port |
 | 404 for 10+ seconds; Traefik logs `defined multiple times with different configurations` | Old and new containers have different routing labels, and the old one was drained. Check the label comparison in the script matches the service |
+| Every deploy logs `Routing labels of … changed` though no label changed | A label holds a literal `$` (written `$$` in Compose), and the script compares without unescaping `compose config` output. Use the `sed 's/\$\$/$/g'` line from Step 3 |
 | 502s or hung requests on every deploy | The running image lacks the drain check, or `interval × retries` exceeds the hook's sleep |
 | Users lose a session or a multi-step action fails during deploys | In-memory state without sticky cookies; see Step 2.5 |
 | A page loads blank or its JavaScript 404s during deploys | HTML and assets came from different releases; see Step 2.5 |
