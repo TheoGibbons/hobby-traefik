@@ -400,6 +400,35 @@ fi
 Both patterns match `*.sh` only. Extensionless scripts need adding to the globs
 by hand, which is a good reason to keep the `.sh` suffix on everything.
 
+### 5. Run the deploy script that was just pulled
+
+Bash keeps running the copy of `scripts/deploy.sh` it opened, so a change to the
+script itself would otherwise take effect one deploy late. Record the commit
+directly before `git pull --ff-only`:
+
+```bash
+pulled_from="$(git rev-parse HEAD)"
+git pull --ff-only
+```
+
+and after the checks above, start over on the new copy when it changed. Its own
+pull then finds nothing new, so it restarts at most once:
+
+```bash
+# Bash keeps running the copy of this script it started with, not the one just
+# pulled, so a change to deploy.sh would otherwise take effect one deploy late.
+# Start over on the new copy once the checks above have passed it; its own
+# pull then finds nothing new.
+if ! git diff --quiet "$pulled_from" HEAD -- scripts/deploy.sh; then
+  echo "scripts/deploy.sh changed; restarting on the new copy."
+  exec bash "$repo_dir/scripts/deploy.sh" "$@"
+fi
+```
+
+Everything before the pull runs twice on such a deploy, so keep it to checks.
+The deploy that adds this block still runs the old script; every change to the
+script after that applies on the deploy that ships it.
+
 ### Diagnosing and repairing an existing repository
 
 `git ls-files --eol` is the purpose-built diagnostic. It reports the index and

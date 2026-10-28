@@ -464,10 +464,13 @@ linking into this repository:
 
 Expect this, and do not mistake it for failure:
 
-1. **The deploy that ships this change still has the old downtime.** CI runs the
-   `scripts/deploy.sh` already on the server, which opens before `git pull`
-   replaces it, so that run is a plain `up`.
-   That run also recreates the container from the new image and labels, so:
+1. **The deploy that ships this change still blips once.** If `scripts/deploy.sh`
+   restarts itself after pulling (step 5 of "Line endings and the executable
+   bit" in `playbook-traefik-integration.md`), that run already rolls out, but
+   the container it replaces lacks the drain check. Without the restart, CI runs
+   the `scripts/deploy.sh` already on the server, which opens before `git pull`
+   replaces it, so that run is a plain `up` with the old downtime.
+   Either way that run recreates the container from the new image and labels, so:
 2. **Every deploy after that is seamless.**
 
 If instead the change is first deployed by hand with `git pull` and then the new

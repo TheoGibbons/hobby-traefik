@@ -102,7 +102,7 @@ genuinely differ:
 
 | Script | Purpose |
 |---|---|
-| `scripts/deploy.sh` | LIVE. Refuses a dirty tree, `git pull --ff-only`, validates, builds, waits for healthy |
+| `scripts/deploy.sh` | LIVE. Refuses a dirty tree, `git pull --ff-only`, restarts itself if the pull changed it, validates, builds, waits for healthy |
 | `scripts/up-local.sh` | Local, standalone |
 | `scripts/up-local-traefik.sh` | Local, through the shared proxy |
 
