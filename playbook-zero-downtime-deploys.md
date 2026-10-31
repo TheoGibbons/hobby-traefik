@@ -453,8 +453,8 @@ linking into this repository:
   docker-rollout plugin and the script stops with the install command where it is
   missing.
 - **Setup push-to-deploy:** a push runs the `scripts/deploy.sh` already on the
-  server, which then pulls, so a change to the script takes effect from the
-  following deploy.
+  server, which pulls and starts over on the new copy when the pull changed it,
+  so a change to the script takes effect on the deploy that ships it.
 - **Operating it:** container names change on every deploy, so use
   `docker compose … logs app`. If Step 2.5 applied, what does not survive a
   deploy.
